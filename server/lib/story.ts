@@ -93,7 +93,11 @@ export async function generateStory({
   // Build the prompt
   const messages = [{
     role: "system" as const,
-    content: "You are a creative narrative generator for our game engine. You create engaging interactive narratives for a choose your own adventure type game and you incorporate told in a ;;mood;; ;;narrativestyle;; .",
+    content: `You are a creative narrative generator for our spy-themed adventure game. You create engaging interactive narratives in a ${finalMood} tone with a ${finalNarrative} storytelling style.
+
+This game is set in the high-stakes world of international espionage, luxury, and intrigue. Players take on missions, develop relationships with various characters, and navigate complex scenarios where betrayal, romance, and action are common themes. The game tracks character relationships, currency balances, and mission progress.
+
+Your narratives should be immersive, exciting, and offer meaningful choices that impact the story and the player's status in the game world. Always maintain the selected mood and narrative style throughout your storytelling.`,
   }, {
     role: "user" as const,
     content: `Create a story with:
@@ -105,7 +109,12 @@ export async function generateStory({
       ${storyContext ? `Previous Context: ${storyContext}` : ''}
       ${previousChoice ? `Previous Choice: ${previousChoice}` : ''}
 
-      Generate an engaging story segment with 3 choices. Format as JSON with:
+      Generate an engaging story segment with 3 choices. 
+      
+      ${storyId ? `This is a continuation of an existing story with ID ${storyId}. Maintain narrative consistency.` : 'This is the beginning of a new story.'}
+      ${protagonistName ? `The protagonist is ${protagonistName} (${protagonistGender}), currently at level ${protagonistLevel}.` : ''}
+      
+      Format as JSON with:
       {
         "title": "Story title",
         "text": "Story text",
@@ -126,8 +135,28 @@ export async function generateStory({
   }];
 
   try {
+    // For existing stories, build rich context from the database
+    if (storyId) {
+      // Get rich context for ongoing stories
+      const storyContext = await buildStoryContext(userId, storyId, previousChoice);
+      
+      // Add formatted context to messages
+      messages.push({
+        role: "user" as const,
+        content: `
+        Previous story context: ${storyContext.previousStoryText}
+        ${previousChoice ? `You chose: ${previousChoice}` : ''}
+        
+        Current missions: ${formatMissions(storyContext.activeMissions)}
+        Character relationships: ${formatCharacterRelationships(storyContext.characterRelationships)}
+        Currencies: ${formatCurrencies(storyContext.currencyBalances)}
+        Player level: ${storyContext.experienceLevel}
+        `
+      });
+    }
+    
     const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini", // Changed to gpt-4o-mini
+      model: "gpt-4o-mini",
       messages,
       temperature: 0.8,
       response_format: { type: "json_object" }
