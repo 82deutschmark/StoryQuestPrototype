@@ -1,4 +1,161 @@
 
+# API Documentation
+
+## Story State Management
+
+### Overview
+
+The application uses a stateful approach to manage the story progression through multiple interactions with the OpenAI API. The first prompt establishes the initial story context, while subsequent prompts maintain continuity by including relevant information from the database.
+
+### State Management Process
+
+1. **Initial Story Generation**
+   - User selects parameters (conflict, setting, narrative style, mood)
+   - System generates the first story segment with these parameters
+   - Story data, mission, characters, and choices are stored in the database
+
+2. **Subsequent Interactions**
+   - When a user makes a choice, the system retrieves:
+     - Previous story context
+     - User choice
+     - Character relationships
+     - Active mission status
+     - Currency balances
+   - This context is included in the next prompt to OpenAI
+
+3. **Context Windows**
+   - To manage token limits, we maintain a rolling context window
+   - Only the most recent 3-5 interactions are included in full
+   - Earlier interactions are summarized
+
+### Database Integration
+
+The following information is retrieved from the database for each prompt:
+
+1. **Story Context**
+   - Previous narrative text
+   - Current plot branch metadata
+   - User's choice history
+
+2. **Character Information**
+   - Character relationships with the protagonist
+   - Character evolution (traits gained/lost)
+   - Character involvement in the story
+
+3. **Mission Information**
+   - Active mission details
+   - Current mission progress
+   - Mission-related characters
+
+4. **User State**
+   - Current currency balances
+   - Experience level
+   - Achievements
+   - Character relationships
+
+### API Endpoints
+
+#### Generate Initial Story
+```
+POST /api/story/generate
+```
+Generates the first segment of a story and establishes the context.
+
+#### Make Story Choice
+```
+POST /api/story/choice
+```
+Processes a user choice, updates the database, and generates the next story segment.
+
+#### Get Current Story
+```
+GET /api/story/current/:userId
+```
+Retrieves the current story state for the user.
+
+## Implementation Details
+
+### Context Building Function
+
+We use a dedicated function to build context for each prompt:
+
+```typescript
+async function buildStoryContext(userId: string, storyId: string, choice?: string): Promise<PromptContext> {
+  // 1. Retrieve story data
+  const storyData = await db.query.stories.findFirst({
+    where: eq(schema.stories.id, parseInt(storyId)),
+    with: {
+      nodes: true,
+      choices: true
+    }
+  });
+
+  // 2. Get user progress data
+  const userProgress = await db.query.userProgress.findFirst({
+    where: eq(schema.userProgress.userId, parseInt(userId))
+  });
+
+  // 3. Get active missions
+  const activeMissions = await db.query.missions.findMany({
+    where: and(
+      eq(schema.missions.userId, parseInt(userId)),
+      eq(schema.missions.status, 'active')
+    )
+  });
+
+  // 4. Get character relationships
+  const characterRelationships = userProgress?.relationshipNetwork || {};
+
+  // 5. Build the context object
+  return {
+    previousStoryText: storyData?.generatedStory?.text || "",
+    userChoice: choice || null,
+    characterRelationships,
+    activeMissions,
+    currencyBalances: userProgress?.currencyBalances || {},
+    experienceLevel: userProgress?.level || 1
+  };
+}
+```
+
+### Integrating Context into Prompts
+
+For each new interaction, we integrate the context into the prompt:
+
+```typescript
+// In story generation function
+const context = await buildStoryContext(userId, storyId, previousChoice);
+
+const messages = [
+  { role: "system", content: systemPrompt },
+  { 
+    role: "user", 
+    content: `
+      ${initialPrompt}
+      
+      Previous Story Context:
+      ${context.previousStoryText}
+      
+      User Choice:
+      ${context.userChoice || "Initial story"}
+      
+      Active Missions:
+      ${formatMissions(context.activeMissions)}
+      
+      Character Relationships:
+      ${formatCharacterRelationships(context.characterRelationships)}
+      
+      User Status:
+      Level: ${context.experienceLevel}
+      Currencies: ${formatCurrencies(context.currencyBalances)}
+      
+      Continue the story based on this context, maintaining continuity and advancing the plot.
+    `
+  }
+];
+```
+
+
 # Cyberpunk Story Game API Documentation
 
 This document outlines the API endpoints for the story-based game prototype. The backend is built with Express.js and provides various endpoints for story generation, user progress tracking, and character evolution.

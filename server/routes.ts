@@ -13,10 +13,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Generate new story
   app.post("/api/story/generate", async (req, res) => {
     try {
-      const story = await generateStory(req.body);
-      const savedStory = await storage.createStory(story);
+      const { userId, ...storyParams } = req.body;
+      
+      if (!userId) {
+        return res.status(400).json({ error: "userId is required" });
+      }
+      
+      const story = await generateStory({
+        ...storyParams,
+        userId
+      });
+      
+      const savedStory = await storage.createStory({
+        ...story,
+        userId: parseInt(userId)
+      });
+      
       res.json(savedStory);
     } catch (error) {
+      console.error("Story generation error:", error);
       res.status(500).json({ error: "Failed to generate story" });
     }
   });

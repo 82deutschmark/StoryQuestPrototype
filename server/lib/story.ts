@@ -1,4 +1,5 @@
-import OpenAI from "openai";
+import { OpenAI } from "openai";
+import { buildStoryContext, formatMissions, formatCharacterRelationships, formatCurrencies } from "./contextBuilder";
 import { type Story } from "@shared/schema";
 
 // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
@@ -61,6 +62,8 @@ export interface GenerateStoryParams {
   protagonistName?: string;
   protagonistGender?: string;
   protagonistLevel?: number;
+  userId: string;
+  storyId?: string;
 }
 
 export async function generateStory({
@@ -78,7 +81,9 @@ export async function generateStory({
   additionalCharacters,
   protagonistName,
   protagonistGender,
-  protagonistLevel = 1
+  protagonistLevel = 1,
+  userId,
+  storyId
 }: GenerateStoryParams): Promise<Story> {
   const finalConflict = customConflict || conflict;
   const finalSetting = customSetting || setting;
@@ -122,7 +127,7 @@ export async function generateStory({
 
   try {
     const response = await openai.chat.completions.create({
-      model: "gpt-4o",
+      model: "gpt-4o-mini", // Changed to gpt-4o-mini
       messages,
       temperature: 0.8,
       response_format: { type: "json_object" }
@@ -134,8 +139,8 @@ export async function generateStory({
     const storyData = JSON.parse(content);
 
     return {
-      id: 0, // Will be set by database
-      userId: 0, // Will be set when saving
+      id: storyId ? parseInt(storyId) : 0, // Use storyId if available
+      userId: parseInt(userId), //Added userId
       conflict: finalConflict,
       setting: finalSetting,
       narrativeStyle: finalNarrative,
