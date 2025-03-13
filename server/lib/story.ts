@@ -2,7 +2,7 @@ import { OpenAI } from "openai";
 import { buildStoryContext, formatMissions, formatCharacterRelationships, formatCurrencies } from "./contextBuilder";
 import { type Story } from "@shared/schema";
 
-// the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
+// the newest OpenAI model is "gpt-4o-mini" 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 const STORY_OPTIONS = {
@@ -17,7 +17,7 @@ const STORY_OPTIONS = {
     ["🧠", "Mind control experiment"]
   ],
   settings: [
-    ["🗼", "Paris Office"],
+    ["🗼", "Paris Underworld"],
     ["🏝️", "Private Luxury Island"],
     ["🏙️", "Dubai Mega-Skyscraper"],
     ["🚢", "Orbital Cruise Liner"],
@@ -93,7 +93,7 @@ export async function generateStory({
   // Build the prompt
   const messages = [{
     role: "system" as const,
-    content: "You are a creative story generator that creates engaging interactive narratives.",
+    content: "You are a creative narrative generator for our game engine. You create engaging interactive narratives for a choose your own adventure type game and you incorporate told in a ;;mood;; ;;narrativestyle;; .",
   }, {
     role: "user" as const,
     content: `Create a story with:
