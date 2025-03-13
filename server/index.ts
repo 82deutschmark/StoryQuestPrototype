@@ -69,3 +69,64 @@ app.use((req, res, next) => {
     log(`serving on port ${port}`);
   });
 })();
+import express from 'express';
+import cors from 'cors';
+import { createServer } from 'vite';
+import { spawn } from 'child_process';
+import path from 'path';
+import { registerRoutes } from './routes';
+import { viteConfig } from './vite';
+
+async function createApp() {
+  // Create Express app
+  const app = express();
+  
+  // Configure middleware
+  app.use(cors());
+  app.use(express.json());
+  
+  // Register API routes
+  const httpServer = await registerRoutes(app);
+  
+  // Create Vite dev server for frontend
+  const vite = await createServer(viteConfig);
+  app.use(vite.middlewares);
+  
+  // Start Flask backend for game logic
+  const flaskProcess = spawn('python', ['server/app.py']);
+  
+  flaskProcess.stdout.on('data', (data) => {
+    console.log(`Flask: ${data}`);
+  });
+  
+  flaskProcess.stderr.on('data', (data) => {
+    console.error(`Flask error: ${data}`);
+  });
+  
+  flaskProcess.on('close', (code) => {
+    console.log(`Flask process exited with code ${code}`);
+  });
+  
+  // Handle shutdown
+  const shutdown = () => {
+    console.log('Shutting down...');
+    flaskProcess.kill();
+    process.exit(0);
+  };
+  
+  process.on('SIGINT', shutdown);
+  process.on('SIGTERM', shutdown);
+  
+  return httpServer;
+}
+
+// Bootstrap the app
+createApp().then((server) => {
+  const port = process.env.PORT || 3000;
+  server.listen(port, () => {
+    console.log(`Server running at http://0.0.0.0:${port}`);
+  });
+}).catch((err) => {
+  console.error('Failed to start server:', err);
+  process.exit(1);
+});
