@@ -1,32 +1,14 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
-import session from "express-session";
-import passport from "passport";
-import { registerAuthRoutes } from "./auth";
-import MemoryStore from "memorystore";
+import { registerAuthRoutes, setUser } from "./auth";
 
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-// Setup session handling
-const MemoryStoreSession = MemoryStore(session);
-app.use(
-  session({
-    cookie: { maxAge: 86400000 },
-    store: new MemoryStoreSession({
-      checkPeriod: 86400000, // prune expired entries every 24h
-    }),
-    resave: false,
-    saveUninitialized: false,
-    secret: process.env.SESSION_SECRET || "keyboard cat",
-  })
-);
-
-// Initialize passport
-app.use(passport.initialize());
-app.use(passport.session());
+// Simple auth middleware
+app.use(setUser);
 
 app.use((req, res, next) => {
   const start = Date.now();

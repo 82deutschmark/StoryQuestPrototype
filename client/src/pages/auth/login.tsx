@@ -15,20 +15,18 @@ import { insertUserSchema } from "@shared/schema";
 export default function Login() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
-  const [isRegister, setIsRegister] = useState(false);
 
   const {
     register,
     handleSubmit,
     formState: { errors },
   } = useForm({
-    resolver: zodResolver(insertUserSchema),
+    resolver: zodResolver(insertUserSchema.pick({ username: true })),
   });
 
   const mutation = useMutation({
-    mutationFn: async (data: any) => {
-      const endpoint = isRegister ? "/api/auth/register" : "/api/auth/login";
-      return apiRequest("POST", endpoint, data);
+    mutationFn: async (data: { username: string }) => {
+      return apiRequest("POST", "/api/auth/login", data);
     },
     onSuccess: () => {
       navigate("/game");
@@ -51,9 +49,7 @@ export default function Login() {
       >
         <Card className="w-full max-w-md">
           <CardHeader>
-            <CardTitle>
-              {isRegister ? "Create Account" : "Welcome Back"}
-            </CardTitle>
+            <CardTitle>Enter Game</CardTitle>
           </CardHeader>
           <CardContent>
             <form
@@ -74,38 +70,12 @@ export default function Login() {
                 )}
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  {...register("password")}
-                  className={errors.password ? "border-destructive" : ""}
-                />
-                {errors.password && (
-                  <p className="text-sm text-destructive">
-                    {errors.password.message as string}
-                  </p>
-                )}
-              </div>
-
               <Button
                 type="submit"
                 className="w-full"
                 disabled={mutation.isPending}
               >
-                {isRegister ? "Create Account" : "Login"}
-              </Button>
-
-              <Button
-                type="button"
-                variant="ghost"
-                className="w-full"
-                onClick={() => setIsRegister(!isRegister)}
-              >
-                {isRegister
-                  ? "Already have an account? Login"
-                  : "Need an account? Register"}
+                Start Playing
               </Button>
             </form>
           </CardContent>

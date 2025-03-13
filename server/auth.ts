@@ -1,83 +1,43 @@
 import { type Request, Response, NextFunction } from "express";
-import passport from "passport";
-import { Strategy as LocalStrategy } from "passport-local";
 import { storage } from "./storage";
 import { insertUserSchema } from "@shared/schema";
 import { fromZodError } from "zod-validation-error";
+import type { Express } from "express";
 
-// Setup passport local strategy
-passport.use(
-  new LocalStrategy(async (username, password, done) => {
-    try {
-      const user = await storage.getUserByUsername(username);
-      if (!user) {
-        return done(null, false, { message: "Incorrect username" });
-      }
-      if (user.password !== password) { // In production, use proper password hashing
-        return done(null, false, { message: "Incorrect password" });
-      }
-      return done(null, user);
-    } catch (error) {
-      return done(error);
-    }
-  })
-);
-
-passport.serializeUser((user: any, done) => {
-  done(null, user.id);
-});
-
-passport.deserializeUser(async (id: number, done) => {
-  try {
-    const user = await storage.getUser(id);
-    done(null, user);
-  } catch (error) {
-    done(error);
+// Simple middleware to store current user in req
+export function setUser(req: Request, res: Response, next: NextFunction) {
+  const username = req.headers["x-username"];
+  if (username && typeof username === "string") {
+    req.user = { username };
   }
-});
+  next();
+}
 
-// Authentication middleware
+// Simple auth check
 export function isAuthenticated(req: Request, res: Response, next: NextFunction) {
-  if (req.isAuthenticated()) {
+  if (req.user) {
     return next();
   }
   res.status(401).json({ message: "Unauthorized" });
 }
 
-// Authentication routes
+// Simplified auth routes
 export function registerAuthRoutes(app: Express) {
-  app.post("/api/auth/register", async (req, res) => {
+  app.post("/api/auth/login", async (req, res) => {
     try {
-      const validatedUser = insertUserSchema.parse(req.body);
-      const existingUser = await storage.getUserByUsername(validatedUser.username);
-      
-      if (existingUser) {
-        return res.status(400).json({ message: "Username already exists" });
+      const { username } = req.body;
+
+      let user = await storage.getUserByUsername(username);
+
+      if (!user) {
+        // Auto-create user if they don't exist
+        user = await storage.createUser({ username });
       }
 
-      const user = await storage.createUser(validatedUser);
-      req.login(user, (err) => {
-        if (err) {
-          return res.status(500).json({ message: "Failed to login after registration" });
-        }
-        return res.json(user);
-      });
+      res.json(user);
     } catch (error) {
-      if (error.name === "ZodError") {
-        return res.status(400).json({ message: fromZodError(error).message });
-      }
-      res.status(500).json({ message: "Failed to register" });
+      res.status(500).json({ message: "Failed to login" });
     }
-  });
-
-  app.post("/api/auth/login", passport.authenticate("local"), (req, res) => {
-    res.json(req.user);
-  });
-
-  app.post("/api/auth/logout", (req, res) => {
-    req.logout(() => {
-      res.json({ message: "Logged out successfully" });
-    });
   });
 
   app.get("/api/auth/user", (req, res) => {
