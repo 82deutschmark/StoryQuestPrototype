@@ -97,7 +97,12 @@ export async function generateStory({
 
 This game is set in the high-stakes world of international espionage, luxury, and intrigue. Players take on missions, develop relationships with various characters, and navigate complex scenarios where betrayal, romance, and action are common themes. The game tracks character relationships, currency balances, and mission progress.
 
-Your narratives should be immersive, exciting, and offer meaningful choices that impact the story and the player's status in the game world. Always maintain the selected mood and narrative style throughout your storytelling.`,
+Your narratives should be immersive, exciting, and offer meaningful choices that impact the story and the player's status in the game world. Always maintain the selected mood and narrative style throughout your storytelling.
+
+For initial story segments:
+1. Always introduce a character with the "mission-giver" role who assigns a mission to the player
+2. Ensure one of the three choices involves meeting/interacting with a random character (to organically introduce potential future mission-givers)
+3. Structure the mission with a clear objective, target, reward, and deadline`,
   }, {
     role: "user" as const,
     content: `Create a story with:
@@ -111,8 +116,13 @@ Your narratives should be immersive, exciting, and offer meaningful choices that
 
       Generate an engaging story segment with 3 choices. 
       
-      ${storyId ? `This is a continuation of an existing story with ID ${storyId}. Maintain narrative consistency.` : 'This is the beginning of a new story.'}
+      ${storyId ? `This is a continuation of an existing story with ID ${storyId}. Maintain narrative consistency.` : 'This is the beginning of a new story. You MUST introduce a character with the "mission-giver" role who assigns a specific mission to the player. Make this interaction a central part of the narrative.'}
       ${protagonistName ? `The protagonist is ${protagonistName} (${protagonistGender}), currently at level ${protagonistLevel}.` : ''}
+      
+      If this is the beginning of a story, ensure:
+      1. One choice advances the mission directly
+      2. One choice takes a risky approach to the mission
+      3. One choice MUST involve meeting/interacting with a random character who could become important later
       
       Format as JSON with:
       {
@@ -153,6 +163,48 @@ Your narratives should be immersive, exciting, and offer meaningful choices that
         Player level: ${storyContext.experienceLevel}
         `
       });
+    }
+    
+    // If this is a new story, fetch potential mission givers from the database
+    if (!storyId) {
+      try {
+        // Query the database for characters with the mission-giver role
+        const missionGivers = await db.query.characters.findMany({
+          where: { role: { contains: "mission-giver" } },
+          limit: 3
+        });
+        
+        if (missionGivers && missionGivers.length > 0) {
+          // Add mission-giver character info to the messages
+          messages.push({
+            role: "user" as const,
+            content: `Use one of these mission-givers in your story: ${missionGivers.map(mg => 
+              `${mg.name} (ID: ${mg.id}) - ${mg.description || 'A mysterious operative'}`
+            ).join(', ')}`
+          });
+          
+          // Also provide some random characters for the third choice
+          const randomCharacters = await db.query.characters.findMany({
+            where: { 
+              role: { notContains: "mission-giver" },
+              id: { notIn: missionGivers.map(mg => mg.id) }
+            },
+            limit: 3
+          });
+          
+          if (randomCharacters && randomCharacters.length > 0) {
+            messages.push({
+              role: "user" as const,
+              content: `For the third choice that introduces a random character, please use one of these: ${randomCharacters.map(c => 
+                `${c.name} (ID: ${c.id}) - ${c.description || 'An intriguing individual'}`
+              ).join(', ')}`
+            });
+          }
+        }
+      } catch (error) {
+        console.warn("Failed to fetch mission-givers from database:", error);
+        // Continue without the character data if there's an error
+      }
     }
     
     const response = await openai.chat.completions.create({
