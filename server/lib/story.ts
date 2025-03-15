@@ -90,19 +90,23 @@ export async function generateStory({
   const finalNarrative = customNarrative || narrativeStyle;
   const finalMood = customMood || mood;
 
+  // Set initial time and location for new stories
+  const initialTime = "Noon on Day 1";
+  const initialLocation = "the bustling main square of Paris";
+
   // Build the prompt
   const messages = [{
     role: "system" as const,
     content: `You are a creative narrative generator for our spy-themed adventure game. You create engaging interactive narratives in a ${finalMood} tone with a ${finalNarrative} storytelling style.
 
-This game is set in the high-stakes world of international espionage, luxury, and intrigue. Players take on missions, develop relationships with various characters, and navigate complex scenarios where betrayal, romance, and action are common themes. The game tracks character relationships, currency balances, and mission progress.
+This game is set in the high-stakes world of international espionage, luxury, and intrigue. ${!storyId ? `At the beginning of the story, it is ${initialTime}. The protagonist is currently located at ${initialLocation}.` : ''} Players take on missions, develop relationships with various characters, and navigate complex scenarios where betrayal, romance, and action are common themes. The game tracks character relationships, currency balances, mission progress, time progression, and character locations.
 
-Your narratives should be immersive, exciting, and offer meaningful choices that impact the story and the player's status in the game world. Always maintain the selected mood and narrative style throughout your storytelling.
+Your narratives should incorporate time and location consistently, ensuring players understand when and where events are taking place. For instance, travel between locations should take a realistic amount of time, missions should have logical deadlines, and characters should be in plausible locations based on previous events. Always maintain the selected mood and narrative style throughout your storytelling.
 
 For initial story segments:
-1. Always introduce a character with the "mission-giver" role who assigns a mission to the player
+1. Always introduce a character with the "mission-giver" role who assigns a mission to the player, specifying both a deadline (in days/hours) and a return location
 2. Ensure one of the three choices involves meeting/interacting with a random character (to organically introduce potential future mission-givers)
-3. Structure the mission with a clear objective, target, reward, and deadline`,
+3. Structure the mission with a clear objective, target location, reward, and explicit deadline that considers time of day`,
   }, {
     role: "user" as const,
     content: `Create a story with:
@@ -128,17 +132,24 @@ For initial story segments:
       {
         "title": "Story title",
         "text": "Story text",
+        "currentTime": "${!storyId ? initialTime : 'Current story time'}",
+        "currentLocation": "${!storyId ? initialLocation : 'Current protagonist location'}",
         "choices": [
           {
             "text": "Choice text",
             "consequence": "Brief outcome description",
-            "cost": {"currency": "💵", "amount": 500}
+            "cost": {"currency": "💵", "amount": 500},
+            "timeChange": "Time that passes if this choice is selected (e.g., '2 hours')",
+            "locationChange": "New location if this choice is selected (or 'same' if unchanged)"
           }
         ],
         "characters": ["List of characters"],
         "mission": {
           "title": "Mission name",
           "description": "Mission details",
+          "target_location": "Where the mission objective is located",
+          "return_location": "Where to return after mission completion",
+          "deadline": "Specific time/day deadline (e.g., 'Evening of Day 2')",
           "reward": {"currency": "💵", "amount": 1000}
         }
       }`
@@ -161,6 +172,10 @@ For initial story segments:
         Character relationships: ${formatCharacterRelationships(storyContext.characterRelationships)}
         Currencies: ${formatCurrencies(storyContext.currencyBalances)}
         Player level: ${storyContext.experienceLevel}
+        Current time: ${storyContext.currentTime || "Noon on Day 1"}
+        Current location: ${storyContext.currentLocation || initialLocation}
+        
+        IMPORTANT: You must maintain consistency with the current time and location. If the player is choosing an action that would change their location, make sure to account for realistic travel time in your narrative. Also, constantly remind players of mission deadlines and the need to return to specific locations.
         `
       });
     }
