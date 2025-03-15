@@ -80,8 +80,8 @@ export async function buildStoryContext(
       activeMissions: missionContext,
       currencyBalances: userProgress.currencyBalances,
       experienceLevel: userProgress.level,
-      currentTime: storyData?.currentTime || defaultContext.currentTime, // Add currentTime to context
-      currentLocation: storyData?.currentLocation || defaultContext.currentLocation // Add currentLocation to context
+      currentTime: storyData?.generatedStory?.currentTime || "Noon on Day 1", // Get time from story or default
+      currentLocation: storyData?.generatedStory?.currentLocation || "the bustling main square of Paris" // Get location from story or default
     };
   } catch (error) {
     console.error("Error building story context:", error);

@@ -91,8 +91,13 @@ export async function generateStory({
   const finalMood = customMood || mood;
 
   // Set initial time and location for new stories
-  const initialTime = "Noon on Day 1";
-  const initialLocation = "the bustling main square of Paris";
+  // For new stories, always start at noon on Day 1
+  const initialTime = storyId ? null : "Noon on Day 1";
+
+  // Extract location from setting if possible, otherwise use the setting directly
+  const initialLocation = finalSetting?.includes("in ") 
+    ? finalSetting.substring(finalSetting.indexOf("in ") + 3).trim() 
+    : finalSetting || "the bustling main square of Paris";
 
   // Build the prompt
   const messages = [{
@@ -119,15 +124,15 @@ For initial story segments:
       ${previousChoice ? `Previous Choice: ${previousChoice}` : ''}
 
       Generate an engaging story segment with 3 choices. 
-      
+
       ${storyId ? `This is a continuation of an existing story with ID ${storyId}. Maintain narrative consistency.` : 'This is the beginning of a new story. You MUST introduce a character with the "mission-giver" role who assigns a specific mission to the player. Make this interaction a central part of the narrative.'}
       ${protagonistName ? `The protagonist is ${protagonistName} (${protagonistGender}), currently at level ${protagonistLevel}.` : ''}
-      
+
       If this is the beginning of a story, ensure:
       1. One choice advances the mission directly
       2. One choice takes a risky approach to the mission
       3. One choice MUST involve meeting/interacting with a random character who could become important later
-      
+
       Format as JSON with:
       {
         "title": "Story title",
@@ -160,26 +165,26 @@ For initial story segments:
     if (storyId) {
       // Get rich context for ongoing stories
       const storyContext = await buildStoryContext(userId, storyId, previousChoice);
-      
+
       // Add formatted context to messages
       messages.push({
         role: "user" as const,
         content: `
         Previous story context: ${storyContext.previousStoryText}
         ${previousChoice ? `You chose: ${previousChoice}` : ''}
-        
+
         Current missions: ${formatMissions(storyContext.activeMissions)}
         Character relationships: ${formatCharacterRelationships(storyContext.characterRelationships)}
         Currencies: ${formatCurrencies(storyContext.currencyBalances)}
         Player level: ${storyContext.experienceLevel}
         Current time: ${storyContext.currentTime || "Noon on Day 1"}
         Current location: ${storyContext.currentLocation || initialLocation}
-        
+
         IMPORTANT: You must maintain consistency with the current time and location. If the player is choosing an action that would change their location, make sure to account for realistic travel time in your narrative. Also, constantly remind players of mission deadlines and the need to return to specific locations.
         `
       });
     }
-    
+
     // If this is a new story, fetch potential mission givers from the database
     if (!storyId) {
       try {
@@ -188,7 +193,7 @@ For initial story segments:
           where: { role: { contains: "mission-giver" } },
           limit: 3
         });
-        
+
         if (missionGivers && missionGivers.length > 0) {
           // Add mission-giver character info to the messages
           messages.push({
@@ -197,7 +202,7 @@ For initial story segments:
               `${mg.name} (ID: ${mg.id}) - ${mg.description || 'A mysterious operative'}`
             ).join(', ')}`
           });
-          
+
           // Also provide some random characters for the third choice
           const randomCharacters = await db.query.characters.findMany({
             where: { 
@@ -206,7 +211,7 @@ For initial story segments:
             },
             limit: 3
           });
-          
+
           if (randomCharacters && randomCharacters.length > 0) {
             messages.push({
               role: "user" as const,
@@ -221,7 +226,7 @@ For initial story segments:
         // Continue without the character data if there's an error
       }
     }
-    
+
     const response = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages,
