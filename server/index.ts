@@ -75,7 +75,7 @@ import { createServer } from 'vite';
 import { spawn } from 'child_process';
 import path from 'path';
 import { registerRoutes } from './routes';
-import { viteConfig } from './vite';
+import viteConfig from '../vite.config.js';
 
 async function createApp() {
   // Create Express app
